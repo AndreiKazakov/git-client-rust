@@ -21,12 +21,12 @@ fn main() {
             decoder
                 .read_to_string(&mut string)
                 .expect("Could not decode the object");
-            println!("{}", get_object_contents(string))
+            print!("{}", get_object_contents(string))
         }
         _ => println!("unknown command: {}", args[1]),
     }
 }
 
 fn get_object_contents(obj: String) -> String {
-    obj[obj.find('\u{0}').expect("Invalid object") + 1..obj.len() - 2].to_owned()
+    obj[obj.find('\u{0}').expect("Invalid object") + 1..].to_owned()
 }
