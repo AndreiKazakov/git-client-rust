@@ -28,5 +28,5 @@ fn main() {
 }
 
 fn get_object_contents(obj: String) -> String {
-    obj[obj.find('\u{0}').expect("Invalid object")..].to_owned()
+    obj[obj.find('\u{0}').expect("Invalid object") + 1..obj.len() - 2].to_owned()
 }
