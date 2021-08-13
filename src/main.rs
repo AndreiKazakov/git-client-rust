@@ -54,15 +54,15 @@ fn get_hex(string: Vec<u8>) -> String {
 }
 
 fn write_object(contents: Vec<u8>, git_type: &str) -> String {
+    let mut data = Vec::new();
+    data.extend_from_slice(format!("{} {}\0", git_type, contents.len()).as_bytes());
+    data.extend(contents);
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder
-        .write_all(format!("{} {}\0", git_type, contents.len()).as_bytes())
-        .unwrap();
-    encoder
-        .write_all(contents.as_slice())
+        .write_all(data.as_slice())
         .expect("Could not encode the object");
     let result = encoder.finish().expect("Could not encode the object");
-    let hash = get_hex(contents);
+    let hash = get_hex(data);
 
     let dir = format!("./.git/objects/{}", &hash[0..2]);
     if fs::metadata(&dir).is_err() {
