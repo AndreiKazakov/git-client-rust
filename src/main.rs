@@ -71,7 +71,11 @@ fn read_object(sha: &str) -> Result<Object, String> {
 
     match &content[0..4] {
         b"blob" => Ok(Object::Blob(
-            content.into_iter().skip_while(|c| *c != b'\0').collect(),
+            content
+                .into_iter()
+                .skip_while(|c| *c != b'\0')
+                .skip(1)
+                .collect(),
         )),
         _ => Err(format!(
             "Unsupported object type: {}",
