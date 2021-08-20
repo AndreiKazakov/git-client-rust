@@ -52,6 +52,28 @@ impl Object {
             }
         }
     }
+
+    fn decode(bytes: Vec<u8>) -> Result<Self, String> {
+        match &bytes[0..4] {
+            b"blob" => Ok(Object::Blob(
+                bytes
+                    .into_iter()
+                    .skip_while(|c| *c != b'\0')
+                    .skip(1)
+                    .collect(),
+            )),
+            _ => Err(format!(
+                "Unsupported object type: {}",
+                std::str::from_utf8(
+                    &bytes
+                        .into_iter()
+                        .take_while(|c| *c != b' ')
+                        .collect::<Vec<u8>>()
+                )
+                .map_err(|err| err.to_string())?
+            )),
+        }
+    }
 }
 
 struct ObjectReference {
@@ -68,26 +90,7 @@ fn read_object(sha: &str) -> Result<Object, String> {
     decoder
         .read_to_end(&mut content)
         .map_err(|err| err.to_string())?;
-
-    match &content[0..4] {
-        b"blob" => Ok(Object::Blob(
-            content
-                .into_iter()
-                .skip_while(|c| *c != b'\0')
-                .skip(1)
-                .collect(),
-        )),
-        _ => Err(format!(
-            "Unsupported object type: {}",
-            std::str::from_utf8(
-                &content
-                    .into_iter()
-                    .take_while(|c| *c != b' ')
-                    .collect::<Vec<u8>>()
-            )
-            .map_err(|err| err.to_string())?
-        )),
-    }
+    Object::decode(content)
 }
 
 fn get_hex(string: Vec<u8>) -> Result<String, String> {
