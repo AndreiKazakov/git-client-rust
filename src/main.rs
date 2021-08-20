@@ -90,10 +90,6 @@ fn read_object(sha: &str) -> Result<Object, String> {
     }
 }
 
-fn get_object_contents(obj: Vec<u8>) -> Vec<u8> {
-    obj.into_iter().skip_while(|c| *c != b'\0').collect()
-}
-
 fn get_hex(string: Vec<u8>) -> Result<String, String> {
     use std::fmt::Write;
 
