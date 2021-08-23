@@ -24,7 +24,7 @@ fn main() -> Result<(), GitError> {
             println!("{}", hash)
         }
         "ls-tree" if args[2] == "--name-only" => match read_object(&args[3])? {
-            Object::Tree(refs) => print!(
+            Object::Tree(refs) => println!(
                 "{}",
                 refs.iter()
                     .map(|r| &*r.name)
