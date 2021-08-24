@@ -190,7 +190,9 @@ fn write_object(obj: Object) -> Result<String, GitError> {
         fs::create_dir(&dir)?;
     }
     let path = format!("{}/{}", dir, &hash[2..]);
-    fs::write(path, result)?;
+    if fs::metadata(&path).is_err() {
+        fs::write(path, result)?;
+    }
     Ok(hash)
 }
 
