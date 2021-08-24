@@ -21,7 +21,7 @@ fn main() -> Result<(), GitError> {
         "hash-object" if args[2] == "-w" => {
             let bytes = fs::read(&args[3]).expect("Could not find the object");
             let hash = write_object(Object::Blob(bytes))?;
-            println!("{}", hash)
+            println!("{}", to_hex(&hash)?)
         }
         "ls-tree" if args[2] == "--name-only" => match read_object(&args[3])? {
             Object::Tree(refs) => println!(
@@ -161,11 +161,11 @@ fn read_object(sha: &str) -> Result<Object, GitError> {
     Object::decode(content)
 }
 
-fn get_sha(string: &[u8]) -> Result<String, GitError> {
+fn get_sha(string: &[u8]) -> Result<Vec<u8>, GitError> {
     let mut sha_one = Sha1::new();
     sha_one.update(string);
     let bytes = sha_one.finalize();
-    to_hex(&bytes)
+    Ok(Vec::from(&bytes[..]))
 }
 
 fn to_hex(bytes: &[u8]) -> Result<String, GitError> {
@@ -178,18 +178,19 @@ fn to_hex(bytes: &[u8]) -> Result<String, GitError> {
     Ok(hash)
 }
 
-fn write_object(obj: Object) -> Result<String, GitError> {
+fn write_object(obj: Object) -> Result<Vec<u8>, GitError> {
     let data = obj.encode();
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(data.as_slice())?;
     let result = encoder.finish()?;
     let hash = get_sha(&data)?;
+    let hex = to_hex(&hash)?;
 
-    let dir = format!("./.git/objects/{}", &hash[0..2]);
+    let dir = format!("./.git/objects/{}", &hex[0..2]);
     if fs::metadata(&dir).is_err() {
         fs::create_dir(&dir)?;
     }
-    let path = format!("{}/{}", dir, &hash[2..]);
+    let path = format!("{}/{}", dir, &hex[2..]);
     if fs::metadata(&path).is_err() {
         fs::write(path, result)?;
     }
