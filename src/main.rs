@@ -90,6 +90,7 @@ impl Object {
                     content.extend(&r.hash);
                 }
                 res.extend_from_slice(content.len().to_string().as_bytes());
+                res.push(b'\0');
                 res.extend(content);
                 res
             }
