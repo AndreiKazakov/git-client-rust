@@ -33,6 +33,7 @@ fn main() -> Result<(), GitError> {
             ),
             _ => return Err(GitError("Not a tree".to_owned())),
         },
+        "write-tree" => println!("{}", to_hex(&write_tree(".", &[".git"])?)?),
         _ => println!("unknown command: {}", args[1]),
     }
     Ok(())
@@ -151,6 +152,42 @@ struct ObjectReference {
     mode: usize,
     name: String,
     hash: Vec<u8>,
+}
+
+fn write_tree(path: &str, ignore: &[&str]) -> Result<Vec<u8>, GitError> {
+    let mut refs = Vec::new();
+
+    for f in fs::read_dir(path)? {
+        let path_buf = f?.path();
+        let name = path_buf
+            .file_name()
+            .ok_or("Could not get a file path")?
+            .to_str()
+            .ok_or("Could not get a file path")?
+            .to_owned();
+        if ignore.contains(&&*name) {
+            continue;
+        }
+        let hash;
+        let mode;
+
+        if path_buf.is_dir() {
+            hash = write_tree(
+                path_buf.to_str().ok_or("Could not get a file path")?,
+                &ignore,
+            )?;
+            mode = 40000;
+        } else {
+            let bytes = fs::read(&path_buf)?;
+            hash = write_object(Object::Blob(bytes))?;
+            mode = 100644;
+        };
+
+        refs.push(ObjectReference { mode, name, hash })
+    }
+
+    refs.sort_by(|a, b| a.name.cmp(&b.name));
+    write_object(Object::Tree(refs))
 }
 
 fn read_object(sha: &str) -> Result<Object, GitError> {
