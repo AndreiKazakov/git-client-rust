@@ -51,7 +51,7 @@ impl Object {
                 let mut res = String::new();
                 for r in refs {
                     res.push_str(&format!(
-                        "{} {} {}    {}",
+                        "{:0>6} {} {}    {}",
                         r.mode,
                         if r.mode.to_string().starts_with('1') {
                             "blob"
