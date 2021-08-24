@@ -39,6 +39,8 @@ fn main() -> Result<(), GitError> {
     Ok(())
 }
 
+type Sha = [u8; 20];
+
 enum Object {
     Blob(Vec<u8>),
     Tree(Vec<ObjectReference>),
@@ -129,7 +131,8 @@ impl Object {
                         })?;
                     let name = std::str::from_utf8(&bytes[i..i + null_pos])?.to_string();
                     i += null_pos + 1;
-                    let hash: Vec<u8> = bytes[i..i + 20].to_vec();
+                    let mut hash = [0u8; 20];
+                    hash.copy_from_slice(&bytes[i..i + 20]);
                     i += 20;
                     refs.push(ObjectReference { mode, name, hash })
                 }
@@ -151,10 +154,10 @@ impl Object {
 struct ObjectReference {
     mode: usize,
     name: String,
-    hash: Vec<u8>,
+    hash: Sha,
 }
 
-fn write_tree(path: &str, ignore: &[&str]) -> Result<Vec<u8>, GitError> {
+fn write_tree(path: &str, ignore: &[&str]) -> Result<Sha, GitError> {
     let mut refs = Vec::new();
 
     for f in fs::read_dir(path)? {
@@ -199,27 +202,29 @@ fn read_object(sha: &str) -> Result<Object, GitError> {
     Object::decode(content)
 }
 
-fn get_sha(string: &[u8]) -> Result<Vec<u8>, GitError> {
+fn get_sha(string: &[u8]) -> Result<Sha, GitError> {
     let mut sha_one = Sha1::new();
     sha_one.update(string);
     let bytes = sha_one.finalize();
-    Ok(Vec::from(&bytes[..]))
+    let mut sha = [0u8; 20];
+    sha[..20].copy_from_slice(&bytes);
+    Ok(sha)
 }
 
-fn to_hex(bytes: &[u8]) -> Result<String, GitError> {
+fn to_hex(bytes: &Sha) -> Result<String, GitError> {
     use std::fmt::Write;
 
     let mut hash = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
+    for byte in bytes.iter() {
         write!(hash, "{:02x}", byte)?;
     }
     Ok(hash)
 }
 
-fn write_object(obj: Object) -> Result<Vec<u8>, GitError> {
+fn write_object(obj: Object) -> Result<Sha, GitError> {
     let data = obj.encode();
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(data.as_slice())?;
+    encoder.write_all(&data)?;
     let result = encoder.finish()?;
     let hash = get_sha(&data)?;
     let hex = to_hex(&hash)?;
