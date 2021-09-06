@@ -1,11 +1,20 @@
-use flate2::read::ZlibDecoder;
-use flate2::write::ZlibEncoder;
-use flate2::Compression;
-use sha1::{Digest, Sha1};
 use std::env;
-use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::{Read, Write};
+use std::process::Command;
+use std::time::SystemTime;
+
+use flate2::Compression;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
+use sha1::{Digest, Sha1};
+
+use git_error::GitError;
+use object::{Contributer, Object, ObjectReference, Sha};
+
+mod git_error;
+mod object;
+mod parser;
 
 fn main() -> Result<(), GitError> {
     let args: Vec<String> = env::args().collect();
@@ -23,6 +32,26 @@ fn main() -> Result<(), GitError> {
             let hash = write_object(Object::Blob(bytes))?;
             println!("{}", to_hex(&hash)?)
         }
+        "commit-tree" if args[3] == "-p" && args[5] == "-m" => {
+            let contributer = Contributer {
+                name: "Andrei".to_owned(),
+                email: "andrei@example.com".to_owned(),
+                timestamp: SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_secs(),
+                timezone: std::str::from_utf8(&Command::new("date").arg("+%z").output()?.stdout)?
+                    .trim_end()
+                    .to_owned(),
+            };
+            let hash = write_object(Object::Commit {
+                tree: args[2].clone(),
+                parents: vec![args[4].clone()],
+                author: contributer.clone(),
+                committer: contributer,
+                message: args[6].clone(),
+            })?;
+            println!("{}", to_hex(&hash)?)
+        }
         "ls-tree" if args[2] == "--name-only" => match read_object(&args[3])? {
             Object::Tree(refs) => println!(
                 "{}",
@@ -37,124 +66,6 @@ fn main() -> Result<(), GitError> {
         _ => println!("unknown command: {}", args[1]),
     }
     Ok(())
-}
-
-type Sha = [u8; 20];
-
-enum Object {
-    Blob(Vec<u8>),
-    Tree(Vec<ObjectReference>),
-}
-
-impl Object {
-    fn content(&self) -> Result<String, GitError> {
-        match self {
-            Self::Blob(bytes) => Ok(std::str::from_utf8(bytes)?.to_owned()),
-            Self::Tree(refs) => {
-                let mut res = String::new();
-                for r in refs {
-                    res.push_str(&format!(
-                        "{:0>6} {} {}    {}",
-                        r.mode,
-                        if r.mode.to_string().starts_with('1') {
-                            "blob"
-                        } else {
-                            "tree"
-                        },
-                        to_hex(&r.hash)?,
-                        r.name
-                    ));
-                    res.push('\n')
-                }
-                Ok(res)
-            }
-        }
-    }
-
-    fn encode(&self) -> Vec<u8> {
-        match self {
-            Self::Blob(bytes) => {
-                let mut res = Vec::new();
-                res.extend_from_slice(b"blob ");
-                res.extend_from_slice(bytes.len().to_string().as_bytes());
-                res.push(b'\0');
-                res.extend(bytes);
-                res
-            }
-            Self::Tree(refs) => {
-                let mut res = Vec::new();
-                res.extend_from_slice(b"tree ");
-                let mut content = Vec::new();
-                for r in refs {
-                    content.extend_from_slice(r.mode.to_string().as_bytes());
-                    content.push(b' ');
-                    content.extend_from_slice(r.name.as_bytes());
-                    content.push(b'\0');
-                    content.extend(&r.hash);
-                }
-                res.extend_from_slice(content.len().to_string().as_bytes());
-                res.push(b'\0');
-                res.extend(content);
-                res
-            }
-        }
-    }
-
-    fn decode(bytes: Vec<u8>) -> Result<Self, GitError> {
-        match &bytes[0..4] {
-            b"blob" => Ok(Object::Blob(
-                bytes
-                    .into_iter()
-                    .skip_while(|c| *c != b'\0')
-                    .skip(1)
-                    .collect(),
-            )),
-            b"tree" => {
-                let mut refs = Vec::new();
-                let mut i = bytes
-                    .iter()
-                    .position(|&b| b == b'\0')
-                    .ok_or("No null character found in tree object")?
-                    + 1;
-
-                while i < bytes.len() {
-                    let mode_bytes = bytes[i..]
-                        .iter()
-                        .take_while(|&&b| b != b' ')
-                        .copied()
-                        .collect::<Vec<u8>>();
-                    let mode: usize = std::str::from_utf8(&mode_bytes)?.parse()?;
-                    i += mode_bytes.len() + 1;
-                    let null_pos =
-                        bytes[i..].iter().position(|&b| b == b'\0').ok_or_else(|| {
-                            GitError("No null character found in tree object".to_string())
-                        })?;
-                    let name = std::str::from_utf8(&bytes[i..i + null_pos])?.to_string();
-                    i += null_pos + 1;
-                    let mut hash = [0u8; 20];
-                    hash.copy_from_slice(&bytes[i..i + 20]);
-                    i += 20;
-                    refs.push(ObjectReference { mode, name, hash })
-                }
-                Ok(Self::Tree(refs))
-            }
-            _ => Err(GitError(format!(
-                "Unsupported object type: {}",
-                std::str::from_utf8(
-                    &bytes
-                        .into_iter()
-                        .take_while(|c| *c != b' ')
-                        .collect::<Vec<u8>>()
-                )?
-            ))),
-        }
-    }
-}
-
-struct ObjectReference {
-    mode: usize,
-    name: String,
-    hash: Sha,
 }
 
 fn write_tree(path: &str, ignore: &[&str]) -> Result<Sha, GitError> {
@@ -238,18 +149,4 @@ fn write_object(obj: Object) -> Result<Sha, GitError> {
         fs::write(path, result)?;
     }
     Ok(hash)
-}
-
-struct GitError(String);
-
-impl Debug for GitError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<A: ToString> From<A> for GitError {
-    fn from(a: A) -> Self {
-        GitError(a.to_string())
-    }
 }
