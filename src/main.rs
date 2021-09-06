@@ -4,9 +4,9 @@ use std::io::{Read, Write};
 use std::process::Command;
 use std::time::SystemTime;
 
-use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
+use flate2::Compression;
 use sha1::{Digest, Sha1};
 
 use git_error::GitError;
@@ -48,7 +48,7 @@ fn main() -> Result<(), GitError> {
                 parents: vec![args[4].clone()],
                 author: contributer.clone(),
                 committer: contributer,
-                message: args[6].clone(),
+                message: format!("{}\n", args[6]),
             })?;
             println!("{}", to_hex(&hash)?)
         }
