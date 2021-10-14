@@ -9,14 +9,14 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
 
-use git_error::GitError;
+use git_error::{GitError, GitResult};
 use object::{Contributer, Object, ObjectReference, Sha};
 
 mod git_error;
 mod object;
 mod parser;
 
-fn main() -> Result<(), GitError> {
+fn main() -> GitResult<()> {
     let args: Vec<String> = env::args().collect();
     match args[1].as_str() {
         "init" => {
@@ -68,7 +68,7 @@ fn main() -> Result<(), GitError> {
     Ok(())
 }
 
-fn write_tree(path: &str, ignore: &[&str]) -> Result<Sha, GitError> {
+fn write_tree(path: &str, ignore: &[&str]) -> GitResult<Sha> {
     let mut refs = Vec::new();
 
     for f in fs::read_dir(path)? {
@@ -104,7 +104,7 @@ fn write_tree(path: &str, ignore: &[&str]) -> Result<Sha, GitError> {
     write_object(Object::Tree(refs))
 }
 
-fn read_object(sha: &str) -> Result<Object, GitError> {
+fn read_object(sha: &str) -> GitResult<Object> {
     let path = format!("./.git/objects/{}/{}", &sha[0..2], &sha[2..]);
     let bytes = fs::read(path)?;
     let mut decoder = ZlibDecoder::new(bytes.as_slice());
@@ -113,7 +113,7 @@ fn read_object(sha: &str) -> Result<Object, GitError> {
     Object::decode(content)
 }
 
-fn get_sha(string: &[u8]) -> Result<Sha, GitError> {
+fn get_sha(string: &[u8]) -> GitResult<Sha> {
     let mut sha_one = Sha1::new();
     sha_one.update(string);
     let bytes = sha_one.finalize();
@@ -122,7 +122,7 @@ fn get_sha(string: &[u8]) -> Result<Sha, GitError> {
     Ok(sha)
 }
 
-fn to_hex(bytes: &Sha) -> Result<String, GitError> {
+fn to_hex(bytes: &Sha) -> GitResult<String> {
     use std::fmt::Write;
 
     let mut hash = String::with_capacity(bytes.len() * 2);
@@ -132,7 +132,7 @@ fn to_hex(bytes: &Sha) -> Result<String, GitError> {
     Ok(hash)
 }
 
-fn write_object(obj: Object) -> Result<Sha, GitError> {
+fn write_object(obj: Object) -> GitResult<Sha> {
     let data = obj.encode();
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(&data)?;

@@ -13,3 +13,5 @@ impl<A: ToString> From<A> for GitError {
         GitError(a.to_string())
     }
 }
+
+pub type GitResult<A> = Result<A, GitError>;

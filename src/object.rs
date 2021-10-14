@@ -1,4 +1,4 @@
-use crate::git_error::GitError;
+use crate::git_error::{GitError, GitResult};
 use crate::parser::{parse_string_until, take_until};
 
 pub type Sha = [u8; 20];
@@ -32,7 +32,7 @@ pub struct Contributer {
 }
 
 impl Object {
-    pub fn content(&self) -> Result<String, GitError> {
+    pub fn content(&self) -> GitResult<String> {
         match self {
             Self::Blob(bytes) => Ok(std::str::from_utf8(bytes)?.to_owned()),
             Self::Tree(refs) => {
@@ -157,7 +157,7 @@ impl Object {
         }
     }
 
-    pub fn decode(bytes: Vec<u8>) -> Result<Self, GitError> {
+    pub fn decode(bytes: Vec<u8>) -> GitResult<Self> {
         if &bytes[0..4] == b"blob" {
             Ok(Object::Blob(
                 bytes
