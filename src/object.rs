@@ -1,5 +1,6 @@
 use crate::git_error::{GitError, GitResult};
 use crate::parser::{parse_string_until, take_until};
+use bytes::Bytes;
 
 pub type Sha = [u8; 20];
 
@@ -157,7 +158,7 @@ impl Object {
         }
     }
 
-    pub fn decode(bytes: Vec<u8>) -> GitResult<Self> {
+    pub fn decode(bytes: Bytes) -> GitResult<Self> {
         if &bytes[0..4] == b"blob" {
             Ok(Object::Blob(
                 bytes

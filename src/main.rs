@@ -1,20 +1,18 @@
 use std::env;
 use std::fs;
-use std::io::{Read, Write};
 use std::process::Command;
 use std::time::SystemTime;
 
-use flate2::read::ZlibDecoder;
-use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use sha1::{Digest, Sha1};
 
+use bytes::Bytes;
 use git_error::{GitError, GitResult};
 use object::{Contributer, Object, ObjectReference, Sha};
 
 mod git_error;
 mod object;
 mod parser;
+mod zlib;
 
 fn main() -> GitResult<()> {
     let args: Vec<String> = env::args().collect();
@@ -107,9 +105,7 @@ fn write_tree(path: &str, ignore: &[&str]) -> GitResult<Sha> {
 fn read_object(sha: &str) -> GitResult<Object> {
     let path = format!("./.git/objects/{}/{}", &sha[0..2], &sha[2..]);
     let bytes = fs::read(path)?;
-    let mut decoder = ZlibDecoder::new(bytes.as_slice());
-    let mut content = Vec::new();
-    decoder.read_to_end(&mut content)?;
+    let (_, content) = zlib::read(Bytes::from(bytes))?;
     Object::decode(content)
 }
 
@@ -134,9 +130,7 @@ fn to_hex(bytes: &Sha) -> GitResult<String> {
 
 fn write_object(obj: Object) -> GitResult<Sha> {
     let data = obj.encode();
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(&data)?;
-    let result = encoder.finish()?;
+    let result = zlib::write(&data)?;
     let hash = get_sha(&data)?;
     let hex = to_hex(&hash)?;
 
