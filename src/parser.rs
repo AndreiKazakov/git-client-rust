@@ -1,7 +1,7 @@
 use crate::git_error::GitResult;
-use crate::object::Contributer;
+use crate::object::Contributor;
 
-pub fn parse_contributor(bytes: &[u8]) -> GitResult<(usize, Contributer)> {
+pub fn parse_contributor(bytes: &[u8]) -> GitResult<(usize, Contributor)> {
     let mut i = 0;
     let name = parse_string_until(&bytes[i..], b'<')?.trim_end().to_owned();
     i += name.len() + 2;
@@ -18,7 +18,7 @@ pub fn parse_contributor(bytes: &[u8]) -> GitResult<(usize, Contributer)> {
 
     Ok((
         i,
-        Contributer {
+        Contributor {
             name,
             email,
             timestamp,

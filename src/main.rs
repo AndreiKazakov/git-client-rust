@@ -3,11 +3,10 @@ use std::fs;
 use std::process::Command;
 use std::time::SystemTime;
 
-use sha1::{Digest, Sha1};
-
 use bytes::Bytes;
+
 use git_error::{GitError, GitResult};
-use object::{Contributer, Object, ObjectReference, Sha};
+use object::{Contributor, Object, ObjectReference, Sha};
 
 mod git_error;
 mod object;
@@ -26,12 +25,12 @@ fn main() -> GitResult<()> {
         }
         "cat-file" if args[2] == "-p" => print!("{}", read_object(&args[3])?.content()?),
         "hash-object" if args[2] == "-w" => {
-            let bytes = fs::read(&args[3]).expect("Could not find the object");
+            let bytes = Bytes::from(fs::read(&args[3]).expect("Could not find the object"));
             let hash = write_object(Object::Blob(bytes))?;
-            println!("{}", to_hex(&hash)?)
+            println!("{}", object::to_hex(&hash))
         }
         "commit-tree" if args[3] == "-p" && args[5] == "-m" => {
-            let contributer = Contributer {
+            let contributor = Contributor {
                 name: "Andrei".to_owned(),
                 email: "andrei@example.com".to_owned(),
                 timestamp: SystemTime::now()
@@ -44,11 +43,11 @@ fn main() -> GitResult<()> {
             let hash = write_object(Object::Commit {
                 tree: args[2].clone(),
                 parents: vec![args[4].clone()],
-                author: contributer.clone(),
-                committer: contributer,
+                author: contributor.clone(),
+                committer: contributor,
                 message: format!("{}\n", args[6]),
             })?;
-            println!("{}", to_hex(&hash)?)
+            println!("{}", object::to_hex(&hash))
         }
         "ls-tree" if args[2] == "--name-only" => match read_object(&args[3])? {
             Object::Tree(refs) => println!(
@@ -60,7 +59,7 @@ fn main() -> GitResult<()> {
             ),
             _ => return Err(GitError("Not a tree".to_owned())),
         },
-        "write-tree" => println!("{}", to_hex(&write_tree(".", &[".git"])?)?),
+        "write-tree" => println!("{}", object::to_hex(&write_tree(".", &[".git"])?)),
         _ => println!("unknown command: {}", args[1]),
     }
     Ok(())
@@ -90,7 +89,7 @@ fn write_tree(path: &str, ignore: &[&str]) -> GitResult<Sha> {
             )?;
             mode = 40000;
         } else {
-            let bytes = fs::read(&path_buf)?;
+            let bytes = Bytes::from(fs::read(&path_buf)?);
             hash = write_object(Object::Blob(bytes))?;
             mode = 100644;
         };
@@ -109,30 +108,10 @@ fn read_object(sha: &str) -> GitResult<Object> {
     Object::decode(content)
 }
 
-fn get_sha(string: &[u8]) -> GitResult<Sha> {
-    let mut sha_one = Sha1::new();
-    sha_one.update(string);
-    let bytes = sha_one.finalize();
-    let mut sha = [0u8; 20];
-    sha[..20].copy_from_slice(&bytes);
-    Ok(sha)
-}
-
-fn to_hex(bytes: &Sha) -> GitResult<String> {
-    use std::fmt::Write;
-
-    let mut hash = String::with_capacity(bytes.len() * 2);
-    for byte in bytes.iter() {
-        write!(hash, "{:02x}", byte)?;
-    }
-    Ok(hash)
-}
-
 fn write_object(obj: Object) -> GitResult<Sha> {
-    let data = obj.encode();
+    let (hash, data) = obj.encode();
     let result = zlib::write(&data)?;
-    let hash = get_sha(&data)?;
-    let hex = to_hex(&hash)?;
+    let hex = object::to_hex(&hash);
 
     let dir = format!("./.git/objects/{}", &hex[0..2]);
     if fs::metadata(&dir).is_err() {
