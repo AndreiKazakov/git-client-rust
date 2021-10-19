@@ -87,7 +87,7 @@ impl Object {
         }
     }
 
-    pub fn encode(&self) -> (Sha, Vec<u8>) {
+    pub fn encode(&self) -> (Sha, Bytes) {
         match self {
             Self::Blob(bytes) => {
                 let mut res = Vec::new();
@@ -95,7 +95,7 @@ impl Object {
                 res.extend_from_slice(bytes.len().to_string().as_bytes());
                 res.push(b'\0');
                 res.extend(bytes);
-                (get_sha(&res), res)
+                (get_sha(&res), Bytes::from(res))
             }
             Self::Tree(refs) => {
                 let mut res = Vec::new();
@@ -111,7 +111,7 @@ impl Object {
                 res.extend_from_slice(content.len().to_string().as_bytes());
                 res.push(b'\0');
                 res.extend(content);
-                (get_sha(&res), res)
+                (get_sha(&res), Bytes::from(res))
             }
             Self::Commit {
                 tree,
@@ -155,7 +155,7 @@ impl Object {
                 res.extend_from_slice(content.len().to_string().as_bytes());
                 res.push(b'\0');
                 res.extend(content);
-                (get_sha(&res), res)
+                (get_sha(&res), Bytes::from(res))
             }
         }
     }
@@ -198,7 +198,7 @@ impl Object {
             let mut hash = [0u8; 20];
             hash.copy_from_slice(&bytes[i..i + 20]);
             i += 20;
-            refs.push(ObjectReference { mode, name, hash })
+            refs.push(ObjectReference { mode, name, hash });
         }
         Ok(Self::Tree(refs))
     }
